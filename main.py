@@ -12,5 +12,6 @@ class Item(BaseModel):
 def predict(item, run_id, logger):
     item = Item(**item)
     results = Detoxify('unbiased',device='cuda').predict(item.text)
-    return results
+    data = {k: float(v) for k, v in result.items()}
+    return data
             
