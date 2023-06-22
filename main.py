@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 import torch
 import os
-torch.hub.set_dir(os.path.join(os.getcwd(), 'persistent-storage', 'detoxify'))
+torch.hub.set_dir('/persistent-storage/detoxify')
 model = torch.hub.load('unitaryai/detoxify','unbiased_toxic_roberta')
 from detoxify import Detoxify
 
