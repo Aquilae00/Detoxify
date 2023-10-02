@@ -1,0 +1,68 @@
+from pydantic import BaseModel
+import torch
+import os
+from tensorizer import TensorSerializer
+from tensorizer import TensorDeserializer
+torch.hub.set_dir('/persistent-storage/detoxify')
+model = torch.hub.load('unitaryai/detoxify','unbiased_toxic_roberta')
+from detoxify import Detoxify
+
+
+
+def serialise_model(model, save_path):
+    """Serialise the model and save the weights to the save_path"""
+    try:
+        serializer = TensorSerializer(save_path)
+        serializer.write_module(model)
+        serializer.close()
+        return True
+    except Exception as e:
+        print("Serialisation failed with error: ", e)
+        return False
+
+
+from tensorizer.utils import no_init_or_tensor
+def deserialise_saved_model(model_path, model_id, plaid=True):
+    """Deserialise the model from the model_path and load into GPU memory"""
+
+    # create a config object that we can use to init an empty model
+    config = AutoConfig.from_pretrained(model_id)
+
+    # Init an empty model without loading weights into gpu. We'll load later.
+    with no_init_or_tensor():
+        # Load your model here using whatever class you need to initialise an empty model from a config.
+        model = AutoModelForCausalLM.from_config(config)
+    # Create the deserialiser object
+    #   Note: plaid_mode is a flag that does a much faster deserialisation but isn't safe for training.
+    #    -> only use it for inference.
+    deserializer = TensorDeserializer(model_path, plaid_mode=True)
+
+    # Deserialise the model straight into GPU (zero-copy)
+    print(("Loading model"),  file=sys.stderr)
+    start = time.time()
+    deserializer.load_into_module(model)
+    end = time.time()
+    deserializer.close()
+
+    # Report on the timings.
+    print(f"Initialising empty model took {end_init} seconds",  file=sys.stderr)
+    print((f"\nDeserialising model took {end - start} seconds\n"),  file=sys.stderr)
+
+    return model
+
+# serialise_model(model,'/persistent-storage/detoxify-serialized')
+
+model = deserialise_saved_model('/persistent-storage/detoxify-serialized', )
+
+
+
+class Item(BaseModel):
+    text: str
+
+
+def predict(item, run_id, logger):
+    item = Item(**item)
+    results = model.predict(item.text)
+    data = {k: float(v) for k, v in results.items()}
+    return data
+            
